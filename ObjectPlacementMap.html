@@ -31,15 +31,15 @@ svg:active { cursor: grabbing; }
   stroke-width: 3px;
   stroke-linejoin: round;
 }
-.objlabel {
-  fill: white;
-  font-size: 7px;
+.gridLabel {
+  fill: rgba(230,230,230,0.30);
   pointer-events: none;
   paint-order: stroke;
-  stroke: rgba(0,0,0,0.65);
-  stroke-width: 2px;
+  stroke: #181818;
   stroke-linejoin: round;
+  user-select: none;
 }
+.objlabel { display: none; }
 .hidden { display: none; }
 .layout { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 18px; align-items: start; }
 .mapPanel { min-width: 0; }
@@ -83,13 +83,6 @@ This is a local spatial debug viewer for Geometry Dash custom level data. Import
 <label>Show only object ID: <input id="filter" placeholder="e.g. 1, 8, 1330"></label>
 <button onclick="applyFilter()">Apply</button>
 <button onclick="clearFilter()">Show all</button>
-<label style="margin-left: 8px;">Object size:
-  <select id="objectSizeMode" onchange="setObjectSizeMode(this.value)">
-    <option value="compact" selected>Compact</option>
-    <option value="normal">Normal</option>
-    <option value="full">Full tile</option>
-  </select>
-</label>
 <button onclick="zoomIn()">Zoom +</button>
 <button onclick="zoomOut()">Zoom -</button>
 <button onclick="resetView()">Reset View</button>
@@ -102,13 +95,14 @@ This is a local spatial debug viewer for Geometry Dash custom level data. Import
 <div class="mapPanel">
 <svg id="map" viewBox="0 0 1200 700" role="img" aria-label="Geometry Dash object placement map">
 <g id="gridLayer"></g>
+<g id="labelLayer"></g>
 <g id="objectLayer"></g>
 </svg>
 <div class="mapHelper">
   <span id="cursorGDUnits">GDUnits: --, --</span>
   <span id="cursorGDTiles">GDTiles: --, --</span>
   <span id="viewInfo">View: --</span>
-  <span class="muted">Wheel = zoom, drag = pan, grid = 30 GDUnits / 1 GDTile, object boxes are debug bounds</span>
+  <span class="muted">Wheel = zoom, drag = pan, grid = 30 GDUnits / 1 GDTile, every object box = 1x1 GDTile</span>
 </div>
 </div>
 <div>
@@ -121,6 +115,7 @@ const EMBEDDED_LEVEL_STRING = 'kS38,1_120_2_120_3_120_11_255_12_255_13_255_4_-1_
 
 const svg = document.getElementById('map');
 const gridLayer = document.getElementById('gridLayer');
+const labelLayer = document.getElementById('labelLayer');
 const objectLayer = document.getElementById('objectLayer');
 const summaryBody = document.getElementById('objectSummaryBody');
 
@@ -137,10 +132,11 @@ const MAX_FULL_VIEW_ASPECT = 12.0;
 const OBJECT_STROKE_WIDTH = 0.65;
 const GRID_STROKE_WIDTH = 0.55;
 const MAJOR_GRID_STROKE_WIDTH = 0.75;
-const OBJECT_CORNER_RADIUS_RATIO = 0.075;
-const OBJECT_CORNER_RADIUS_MIN = 0.75;
-const OBJECT_CORNER_RADIUS_MAX = 3.5;
-let objectTileFillRatio = 0.62;
+const OBJECT_CORNER_RADIUS_RATIO = 0.055;
+const OBJECT_CORNER_RADIUS_MIN = 0.45;
+const OBJECT_CORNER_RADIUS_MAX = 2.4;
+const OBJECT_BOX_SIZE_GD_UNITS = 30.0;
+const MAJOR_GRID_INTERVAL_GD_UNITS = 300.0;
 
 const minZoom = 0.05;
 const maxZoom = 40.0;
@@ -153,6 +149,7 @@ function setViewBox() {
   svg.setAttribute('viewBox', viewBox.join(' '));
   updateZoomLabel();
   updateViewInfo();
+  renderGridLabels();
 }
 
 function currentZoom() {
@@ -341,10 +338,11 @@ function computeMapTransform() {
   if (objects.length === 0) {
     minX = 0; maxX = 1200; minY = 0; maxY = 700;
   } else {
-    const lefts = objects.map(o => o.x - (o.sizeXGDUnits || DEFAULT_OBJECT_SIZE_GD_UNITS) * 0.5);
-    const rights = objects.map(o => o.x + (o.sizeXGDUnits || DEFAULT_OBJECT_SIZE_GD_UNITS) * 0.5);
-    const bottoms = objects.map(o => o.y - (o.sizeYGDUnits || DEFAULT_OBJECT_SIZE_GD_UNITS) * 0.5);
-    const tops = objects.map(o => o.y + (o.sizeYGDUnits || DEFAULT_OBJECT_SIZE_GD_UNITS) * 0.5);
+    const halfObject = OBJECT_BOX_SIZE_GD_UNITS * 0.5;
+    const lefts = objects.map(o => o.x - halfObject);
+    const rights = objects.map(o => o.x + halfObject);
+    const bottoms = objects.map(o => o.y - halfObject);
+    const tops = objects.map(o => o.y + halfObject);
 
     minX = Math.min(...lefts);
     maxX = Math.max(...rights);
@@ -423,20 +421,6 @@ function sanitizeScale(value, fallback = 1.0) {
   return clamp(parsed, 0.05, 4.0);
 }
 
-function setObjectSizeMode(mode) {
-  if (mode === "full") {
-    objectTileFillRatio = 0.92;
-  } else if (mode === "normal") {
-    objectTileFillRatio = 0.76;
-  } else {
-    objectTileFillRatio = 0.62;
-  }
-
-  renderObjects();
-  applyFilter();
-  setStatus(`Object size mode: ${mode}`);
-}
-
 
 function makeSvgElement(tag, attrs) {
   const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
@@ -460,14 +444,6 @@ function renderGrid() {
       'stroke-width': gx % 300 === 0 ? MAJOR_GRID_STROKE_WIDTH : GRID_STROKE_WIDTH,
       'vector-effect': 'non-scaling-stroke'
     }));
-
-    if (gx % 300 === 0) {
-      const label = makeSvgElement('text', {
-        x: x + 3, y: originalViewBox[3] - pad / 2 + 18, class: 'axis'
-      });
-      label.textContent = gx;
-      gridLayer.appendChild(label);
-    }
   }
 
   const startY = Math.floor(minY / 30) * 30;
@@ -483,33 +459,98 @@ function renderGrid() {
       'stroke-width': gy % 150 === 0 ? MAJOR_GRID_STROKE_WIDTH : GRID_STROKE_WIDTH,
       'vector-effect': 'non-scaling-stroke'
     }));
+  }
+}
 
-    if (gy % 150 === 0) {
-      const label = makeSvgElement('text', {
-        x: 8, y: y + 4, class: 'axis'
-      });
-      label.textContent = gy;
-      gridLayer.appendChild(label);
-    }
+
+function getLabelIntervalGDUnits(visibleRangeGDUnits) {
+  if (visibleRangeGDUnits <= 900) return 30;
+  if (visibleRangeGDUnits <= 1800) return 60;
+  if (visibleRangeGDUnits <= 3600) return 150;
+  if (visibleRangeGDUnits <= 7200) return 300;
+  if (visibleRangeGDUnits <= 14400) return 600;
+  return 1200;
+}
+
+function renderGridLabels() {
+  if (!labelLayer || !Number.isFinite(mapScale) || mapScale <= 0) return;
+
+  labelLayer.innerHTML = "";
+
+  const zoom = Math.max(0.001, currentZoom());
+
+  // These values are in SVG/viewBox units. Dividing by zoom keeps labels
+  // approximately the same screen size when zooming in/out.
+  const fontSize = 12 / zoom;
+  const strokeWidth = 2.4 / zoom;
+  const edgePadding = 12 / zoom;
+  const minorOffset = 5 / zoom;
+
+  const viewLeft = viewBox[0];
+  const viewRight = viewBox[0] + viewBox[2];
+  const viewTop = viewBox[1];
+  const viewBottom = viewBox[1] + viewBox[3];
+
+  const visibleMinX = inverseTx(viewLeft);
+  const visibleMaxX = inverseTx(viewRight);
+  const visibleMinY = inverseTy(viewBottom);
+  const visibleMaxY = inverseTy(viewTop);
+
+  const labelY = viewBottom - edgePadding;
+  const labelX = viewRight - edgePadding;
+
+  const labelIntervalX = getLabelIntervalGDUnits(visibleMaxX - visibleMinX);
+  const startGX = Math.ceil(visibleMinX / labelIntervalX) * labelIntervalX;
+  const endGX = Math.floor(visibleMaxX / labelIntervalX) * labelIntervalX;
+
+  for (let gx = startGX; gx <= endGX; gx += labelIntervalX) {
+    const x = tx(gx);
+    if (x < viewLeft || x > viewRight) continue;
+
+    const label = makeSvgElement('text', {
+      x: x + minorOffset,
+      y: labelY,
+      class: 'gridLabel',
+      'font-size': fontSize,
+      'stroke-width': strokeWidth
+    });
+    label.textContent = `${formatNumber(gx, 0)} GD`;
+    labelLayer.appendChild(label);
+  }
+
+  const labelIntervalY = getLabelIntervalGDUnits(visibleMaxY - visibleMinY);
+  const startGY = Math.ceil(visibleMinY / labelIntervalY) * labelIntervalY;
+  const endGY = Math.floor(visibleMaxY / labelIntervalY) * labelIntervalY;
+
+  for (let gy = startGY; gy <= endGY; gy += labelIntervalY) {
+    const y = ty(gy);
+    if (y < viewTop || y > viewBottom) continue;
+
+    const label = makeSvgElement('text', {
+      x: labelX,
+      y: y - minorOffset,
+      class: 'gridLabel',
+      'font-size': fontSize,
+      'stroke-width': strokeWidth,
+      'text-anchor': 'end'
+    });
+    label.textContent = `${formatNumber(gy, 0)} GD`;
+    labelLayer.appendChild(label);
   }
 }
 
 function renderObjects() {
   objectLayer.innerHTML = "";
-
-  const counts = new Map();
-  for (const obj of objects) counts.set(obj.objectId, (counts.get(obj.objectId) || 0) + 1);
-  const topIds = new Set([...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([id]) => id));
-
   for (const obj of objects) {
     const x = tx(obj.x);
     const y = ty(obj.y);
 
-    // Relative size is based on the 30-GDUnit grid.
-    // A scale of 1.0 should occupy less than one grid cell in compact mode,
-    // which keeps dense/long levels readable.
-    const width = Math.max(1.5, (obj.sizeXGDUnits || DEFAULT_OBJECT_SIZE_GD_UNITS) * mapScale * objectTileFillRatio);
-    const height = Math.max(1.5, (obj.sizeYGDUnits || DEFAULT_OBJECT_SIZE_GD_UNITS) * mapScale * objectTileFillRatio);
+    // Fixed debug placement box:
+    // every object is shown as exactly one 30-GDUnit / 1-GDTile cell.
+    // This keeps object placement proportionate to the grid regardless of zoom,
+    // imported object scale, or level length.
+    const width = OBJECT_BOX_SIZE_GD_UNITS * mapScale;
+    const height = OBJECT_BOX_SIZE_GD_UNITS * mapScale;
 
     const g = makeSvgElement('g', {
       class: `obj obj-${obj.objectId}`,
@@ -532,21 +573,11 @@ function renderObjects() {
       ry: radius,
       class: 'objectBox',
       fill: colorForId(obj.objectId),
-      opacity: 0.80,
+      opacity: 0.64,
       stroke: 'rgba(5, 5, 5, 0.72)',
       'stroke-width': OBJECT_STROKE_WIDTH,
       'vector-effect': 'non-scaling-stroke'
     }));
-
-    if (topIds.has(obj.objectId) && width > 10 && height > 8) {
-      const label = makeSvgElement('text', {
-        class: 'objlabel',
-        'text-anchor': 'middle',
-        y: 3
-      });
-      label.textContent = obj.objectId;
-      g.appendChild(label);
-    }
 
     objectLayer.appendChild(g);
   }
@@ -567,12 +598,13 @@ function renderLevel(parsedObjects, label = "Loaded level") {
   objects = parsedObjects;
   computeMapTransform();
   renderGrid();
+  renderGridLabels();
   renderObjects();
   renderSummary();
   resetView();
   applyFilter();
   document.getElementById('countLabel').textContent = `${objects.length} objects`;
-  setStatus(`${label}: ${objects.length} objects, ${new Set(objects.map(o => o.objectId)).size} unique IDs, object size = compact`);
+  setStatus(`${label}: ${objects.length} objects, ${new Set(objects.map(o => o.objectId)).size} unique IDs`);
 }
 
 async function loadLevelFromText(text, label = "Imported level") {
@@ -606,7 +638,11 @@ function exportObjectsXml() {
   lines.push('<?xml version="1.0" encoding="UTF-8"?>');
   lines.push(`<GeometryDashLevelObjectExport source="${xmlEscape(currentLevelLabel)}" objectCount="${objects.length}" gdUnitsPerTile="${GD_UNITS_PER_TILE}">`);
 
-  for (const obj of objects) {
+  const sortedObjects = [...objects].sort((a, b) =>
+    (a.x - b.x) || (a.y - b.y) || (a.objectId - b.objectId)
+  );
+
+  for (const obj of sortedObjects) {
     lines.push(
       `  <Object id="${xmlEscape(obj.objectId)}"` +
       ` positionX="${xmlEscape(obj.x)}"` +
