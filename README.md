@@ -163,7 +163,3 @@ For issues, questions, or suggestions:
 - Open an issue on this repository
 - Reference the GDColon Save Editor for level extraction questions
 - Check browser console for detailed error messages
-
----
-
-**Happy level designing! 🎮**
