@@ -1,165 +1,150 @@
 ## GD Object Placement Visualizer
 
-A spatial debug viewer for **Geometry Dash** custom levels that visualizes the placement of all objects within a level. This tool helps creators analyze object distributions, identify clustering issues, and export placement data for further analysis or custom game engine integration.
+A spatial debug viewer for **Geometry Dash** custom level data that visualizes object placement across a full 2D map.
+
+This tool now supports both:
+1. **Direct level imports** (`.gmd`, raw strings, etc.), and  
+2. **Created Levels save parsing** from `CCLocalLevels.dat` / `.xml` / `.plist`, with one-click loading into the map.
 
 ---
 
 ## 📋 Features
 
-- **Spatial Map Viewer** — Interactive 2D visualization of all placed objects with proper coordinate mapping
-- **ID Filtering** — Isolate and highlight specific object types by ID for detailed inspection
-- **Interactive Navigation** — Zoom and pan the level map for clarity
-- **Coordinate Systems** — Display positions in both **GD Units** (native) and **GD Tiles** (1 tile = 30 GD Units)
-- **Object Statistics** — Top 25 most-used object IDs ranked by frequency
-- **XML Export** — Export object placement data as structured XML for use in custom engines
-- **Multiple Input Formats** — Support for `.gmd`, `.txt`, `.xml`, `.json`, and `.html` files
-- **Gzip/Base64 Decoding** — Automatically decompress and decode level strings from save files
-- **Alpha Release** — Feature-rich but may have edge cases with extremely dense object placements
+### Core Visualizer
+- **Interactive 2D Placement Map** — Displays all placed objects with proper coordinate mapping
+- **Object ID Filtering** — Isolate one or more IDs (example: `1, 8, 1330`)
+- **Zoom + Pan Navigation** — Mouse wheel zoom, drag pan, and reset controls
+- **Dual Coordinates**:
+  - **GD Units** (native)
+  - **GD Tiles** (`1 tile = 30 GD Units`)
+- **Top Object Statistics** — Top 25 most-used IDs by frequency
+- **XML Export** — Export object placement + metadata for engine/tool pipelines
+- **Auto Decode Support** — Handles base64 + gzip level data when applicable
+- **Embedded Sample Level** — Quick load for testing
+
+### New: Created Levels Save Browser
+- **Import Created Levels Files**:
+  - `CCLocalLevels.dat`
+  - `.xml`
+  - `.plist`
+  - `.txt` (when compatible save XML/text content is present)
+- **Parses Local Created Levels (`LLM_01`)** from Geometry Dash save structure
+- **Search + Sortable Levels Table** with columns like:
+  - Name / Description
+  - Object Count
+  - Editor Time
+  - Level ID / Copied ID
+  - Attempts / Jumps / Song ID
+  - Folder / Revision / Local Version / Save Key
+  - Compressed size
+- **View Level Action** — Load any listed created level directly into the object placement map
 
 ---
 
 ## 🚀 How to Use
 
-### 1. **Extract Your Level Data**
+## 1) Open the tool
+- Clone/download this repository
+- Open `ObjectPlacementMap.html` in a modern browser (Chrome/Edge recommended)
 
-First, you need to extract the level contents from your Geometry Dash save file:
+## 2) Load a level (two options)
 
-- Visit **[GDColon Save Editor](https://gdcolon.com/gdsave/)** 
-- Upload your save file or paste your level code
-- Locate your custom level and extract the level data
-- Save the extracted data (typically a `.gmd` file or raw level string)
+### Option A — Direct level import
+Use **Import custom level** for:
+- `.gmd`, `.txt`, `.xml`, `.json`, `.html`
 
-### 2. **Open the Visualizer**
+Then click **Load Level**.
 
-- Download or clone this repository
-- Open `ObjectPlacementMap.html` in your browser (Chrome, Edge, or any modern browser with `DecompressionStream` support)
-- An embedded sample level loads automatically
+### Option B — Created Levels import (new)
+Use **Import saved levels** for:
+- `CCLocalLevels.dat`, `.xml`, `.plist`, `.txt`
 
-### 3. **Load Your Level**
+Then click **Load Saved Levels**.
 
-#### Option A: From a File
-- Click **"Import custom level"** and select your extracted level file (`.gmd`, `.txt`, `.xml`, `.json`, or `.html`)
-- Click **"Load Level"** button
-- The map updates with all objects from your level
+After parsing:
+- Browse the **Created Levels** table
+- Search and sort entries
+- Click **View Level** on any row to render it in the map
 
-#### Option B: From Raw Level String
-- If you have a raw decoded level string, paste it directly into a `.txt` file
-- Import using the same file picker
+---
 
-### 4. **Navigate and Explore**
+## 🧭 Map Controls
 
 | Action | Method |
-|--------|--------|
-| **Zoom In** | Mouse wheel up, or click "Zoom +" button |
-| **Zoom Out** | Mouse wheel down, or click "Zoom -" button |
-| **Pan/Move** | Click and drag the map |
-| **Reset View** | Click "Reset View" button |
-| **View Coordinates** | Hover over the map; GD Units and GD Tiles display at bottom |
-
-### 5. **Filter Objects**
-
-- Enter one or more **object IDs** in the "Show only object ID" field (e.g., `1, 8, 1330`)
-- Click **"Apply"** to filter the view
-- Click **"Show all"** to display all objects again
-- The object count updates to show how many match the filter
-
-### 6. **Export Data**
-
-- Click **"Export XML"** to download an XML file containing all object placement data
-- The file includes:
-  - Object ID
-  - Position (in both GD Units and GD Tiles)
-  - Rotation, color, scale, and group data
-  - All metadata for custom engine integration
+|---|---|
+| Zoom In | Mouse wheel up or **Zoom +** |
+| Zoom Out | Mouse wheel down or **Zoom -** |
+| Pan | Click + drag |
+| Reset | **Reset View** |
+| Filter IDs | Enter IDs and click **Apply** |
+| Clear Filter | **Show all** |
+| Export XML | **Export XML** |
 
 ---
 
-## 📊 Understanding the Map
+## 📊 Coordinate + Grid Notes
 
-### Coordinate System
-- **GD Units** — The native coordinate system used by Geometry Dash (1:1 pixel equivalent)
-- **GD Tiles** — Logical grid units where 1 tile = 30 GD Units
-- Every object is displayed as a **1×1 GD Tile box** (30 GD Units) for consistent placement visualization, regardless of actual object size
-
-### Grid
-- **Minor Grid Lines** — 30 GD Units (1 tile) apart
-- **Major Grid Lines** — 300 GD Units (10 tiles) apart
-- Grid labels auto-adjust based on zoom level for readability
-
-### Colors
-- Each unique object ID gets a **distinct hue** for visual distinction
-- Objects are color-coded by type for quick pattern recognition
+- **GD Units** are Geometry Dash native coordinates.
+- **GD Tiles** are logical tiles where `1 tile = 30 GD Units`.
+- Objects are shown as **1×1 tile debug boxes** for consistent placement analysis.
+- Grid:
+  - Minor lines: every **30 units**
+  - Major lines: every **300 units**
+- Grid labels adapt to zoom level.
 
 ---
 
-## 🔗 References & Resources
+## 📁 Supported Inputs
 
-### Essential Tools
-- **[GDColon Save Editor](https://gdcolon.com/gdsave/)** — Extract level data from Geometry Dash save files
-- **[Geometry Dash Object Database](https://geometry-dash.fandom.com/)** — Object ID reference and properties
+### Level Map Import
+| Format | Purpose |
+|---|---|
+| `.gmd` | Geometry Dash level data |
+| `.txt` | Raw decoded level string |
+| `.xml` | XML-compatible level source |
+| `.json` | Level payload (e.g., containing `k4`) |
+| `.html` | Embedded save-like content (`k4`) |
 
-### Geometry Dash Documentation
-- **Object IDs** — Reference all 600+ object types and their properties
-- **Level Format** — Understanding `.gmd` file structure and level string encoding
-- **Coordinate System** — GD Units and tile-based positioning
-
-### Related Projects
-- Custom game engine implementations using exported XML data
-- Level analysis and optimization tools
-- Object distribution heatmaps and analytics
-
----
-
-## ⚠️ Known Limitations & Notes
-
-- **Alpha Release** — This is an early version; edge cases with extremely dense object clusters may cause rendering issues
-- **Browser Support** — Requires modern browsers with `DecompressionStream` API (Chrome, Edge, or equivalent). Firefox may require a workaround
-- **Zoom Limits** — Very long or tall levels have capped initial zoom for usability; zooming in/out allows full exploration
-- **Performance** — Levels with 50,000+ objects may experience lag during interactions
-- **Scale Visualization** — Object size scaling is not visually rendered; all objects display as 1×1 tiles for consistency
+### Created Levels Import
+| Format | Purpose |
+|---|---|
+| `CCLocalLevels.dat` | Main local created-levels save file |
+| `.xml` / `.plist` | Decrypted/converted save structures |
+| `.txt` | Compatible textual save export |
 
 ---
 
 ## 🛠️ Technical Notes
 
-### Architecture
-- **Single HTML File** — No build step or dependencies required
-- **Client-Side Only** — All processing happens in your browser; no data sent to servers
-- **Embedded Sample Level** — Includes a pre-loaded level for testing without file import
-- **SVG-Based Rendering** — Scalable vector graphics for crisp rendering at any zoom level
-
-### Input Formats Supported
-| Format | Example | Notes |
-|--------|---------|-------|
-| `.gmd` | Geometry Dash save format | Automatically decompressed if gzipped |
-| `.txt` | Raw level string | Decoded level data (semicolon-separated) |
-| `.xml` | XML export from this tool | Reimport previously exported data |
-| `.json` | JSON with `k4` field | Must contain the gzipped base64 level data |
-| `.html` | HTML with embedded `<k>k4</k><s>...</s>` | Common export format |
-
-### Level String Format
-Objects are represented as semicolon-separated segments with comma-separated key-value pairs:
-```
-id,1,x_pos,2,y_pos,3,rot,6,color,21|id,1,x_pos,2,y_pos,3,rot,6,color,21|...
-```
+- **Single-file app** (`ObjectPlacementMap.html`)
+- **No build step / no external dependencies**
+- **Browser-only processing** (local; no server upload required)
+- Uses browser decompression APIs (`DecompressionStream`) when needed
+- Includes decoding paths for common Geometry Dash save encodings used in local level data
 
 ---
 
-## 📝 Future Enhancements
+## ⚠️ Limitations
 
-Potential features for future releases:
-- Heatmap visualization showing object density
-- Layer filtering (editor layer support)
-- Group highlighting and analysis
-- Performance optimization for massive levels
-- Mobile touch controls refinement
-- Angle/rotation visualization overlay
+- Very large levels (50k+ objects) may lag during interaction
+- Some edge-case save variants may fail to decode
+- Firefox may require alternative workflows depending on decompression API support
+- Visualized boxes are normalized for placement clarity (not full sprite-size rendering)
 
 ---
 
-## 📧 Support & Feedback
+## 🔗 Helpful Resources
 
-For issues, questions, or suggestions:
-- Open an issue on this repository
-- Reference the GDColon Save Editor for level extraction questions
-- Check browser console for detailed error messages
+- [GDColon Save Editor](https://gdcolon.com/gdsave/) — Save extraction/conversion helper
+- [Geometry Dash Object Reference (Fandom)](https://geometry-dash.fandom.com/) — Object IDs and info
+
+---
+
+## 📝 Feedback
+
+If you find an issue or want to suggest features:
+- Open an issue in this repository
+- Include:
+  - File type used (`.dat`, `.xml`, `.gmd`, etc.)
+  - Browser/version
+  - Console error output (if available)
