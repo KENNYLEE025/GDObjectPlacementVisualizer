@@ -559,7 +559,7 @@ function renderObjects() {
     });
 
     const title = makeSvgElement('title', {});
-    title.textContent = `ID ${obj.objectId} at GDUnits(${obj.x}, ${obj.y}) / GDTiles(${formatNumber(obj.x / GD_UNITS_PER_TILE)}, ${formatNumber(obj.y / GD_UNITS_PER_TILE)}), rot=${obj.rotation}, mainColor=${obj.mainColor}, groups=${obj.groupIds}, scale=(${formatNumber(obj.scaleXFactor)}, ${formatNumber(obj.scaleYFactor)})`;
+    title.textContent = `ID ${obj.objectId} at GDUnits(${obj.x}, ${obj.y}) / GDTiles(${formatNumber(obj.x / GD_UNITS_PER_TILE)}, ${formatNumber(obj.y / GD_UNITS_PER_TILE)}), rot=${obj.rotation}, mainColorID=${obj.mainColor}, groupIDs=${obj.groupIds}, uniformScale=(${formatNumber(obj.scaleXFactor)}, ${formatNumber(obj.scaleYFactor)})`;
     g.appendChild(title);
 
     const radius = getRoundedBoxRadius(width, height);
@@ -636,7 +636,7 @@ function exportObjectsXml() {
 
   const lines = [];
   lines.push('<?xml version="1.0" encoding="UTF-8"?>');
-  lines.push(`<GeometryDashLevelObjectExport source="${xmlEscape(currentLevelLabel)}" objectCount="${objects.length}" gdUnitsPerTile="${GD_UNITS_PER_TILE}">`);
+  lines.push(`<Level source="${xmlEscape(currentLevelLabel)}" objectCount="${objects.length}" gdUnitsPerTile="${GD_UNITS_PER_TILE}">`);
 
   const sortedObjects = [...objects].sort((a, b) =>
     (a.x - b.x) || (a.y - b.y) || (a.objectId - b.objectId)
@@ -661,14 +661,14 @@ function exportObjectsXml() {
     );
   }
 
-  lines.push('</GeometryDashLevelObjectExport>');
+  lines.push('</Level>');
 
   const blob = new Blob([lines.join('\n')], { type: 'application/xml' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   const safeLabel = currentLevelLabel.replace(/[^a-z0-9_-]+/gi, '_').replace(/^_+|_+$/g, '') || 'gd_level';
   link.href = url;
-  link.download = `${safeLabel}_objects.xml`;
+  link.download = `${safeLabel}_level.xml`;
   document.body.appendChild(link);
   link.click();
   link.remove();
