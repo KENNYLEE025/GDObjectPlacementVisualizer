@@ -248,6 +248,7 @@ let minX = 0, maxX = 1200, minY = 0, maxY = 700;
 let mapScale = 1;
 let pad = 90;
 let currentLevelLabel = "level";
+let currentLevelMetadata = { musicID: 0, defaultStartSpeed: 1 };
 let savedLevels = [];
 const GD_UNITS_PER_TILE = 30.0;
 const DEFAULT_OBJECT_SIZE_GD_UNITS = 30.0;
@@ -400,6 +401,47 @@ function parseObjectsFromLevelString(levelString) {
   }
 
   return parsed;
+}
+
+
+function getFiniteIntFromValue(value, fallback = 0) {
+  const parsed = Number(firstValue(value));
+  return Number.isFinite(parsed) ? Math.trunc(parsed) : fallback;
+}
+
+function parseLevelMetadataFromLevelString(levelString, fallbackMusicID = 0) {
+  const metadata = {
+    musicID: getFiniteIntFromValue(fallbackMusicID, 0),
+    defaultStartSpeed: 1
+  };
+
+  const segments = String(levelString || "").split(';').map(s => s.trim()).filter(Boolean);
+  for (const segment of segments) {
+    const d = parsePairSegment(segment);
+
+    // kA4 is the Geometry Dash level setting for the starting speed enum:
+    // 0 = 0.5x, 1 = 1x, 2 = 2x, 3 = 3x, 4 = 4x.
+    if (d["kA4"] !== undefined) {
+      metadata.defaultStartSpeed = getFiniteIntFromValue(d["kA4"], metadata.defaultStartSpeed);
+    }
+
+    // kA13 is available in decoded level settings for music/song selection.
+    // Saved-level rows also pass k8 as a fallback when available.
+    if (d["kA13"] !== undefined) {
+      metadata.musicID = getFiniteIntFromValue(d["kA13"], metadata.musicID);
+    }
+
+    if (d["1"] !== undefined && d["2"] !== undefined && d["3"] !== undefined) {
+      break;
+    }
+  }
+
+  return metadata;
+}
+
+function getFinishPositionXForObjects(levelObjects) {
+  if (!levelObjects || levelObjects.length === 0) return 30.0;
+  return Math.max(...levelObjects.map(obj => obj.x)) + GD_UNITS_PER_TILE;
 }
 
 function extractK4Base64(text) {
@@ -721,8 +763,12 @@ function renderSummary() {
     .join('');
 }
 
-function renderLevel(parsedObjects, label = "Loaded level") {
+function renderLevel(parsedObjects, label = "Loaded level", metadata = {}) {
   currentLevelLabel = label || "level";
+  currentLevelMetadata = {
+    musicID: getFiniteIntFromValue(metadata.musicID, 0),
+    defaultStartSpeed: getFiniteIntFromValue(metadata.defaultStartSpeed, 1)
+  };
   objects = parsedObjects;
   computeMapTransform();
   renderGrid();
@@ -743,7 +789,7 @@ async function loadLevelFromText(text, label = "Imported level") {
     throw new Error("No placed objects found. Expected GD object keys 1, 2, and 3 in the level data.");
   }
 
-  renderLevel(parsed, label);
+  renderLevel(parsed, label, parseLevelMetadataFromLevelString(levelString));
 }
 
 
@@ -762,12 +808,21 @@ function exportObjectsXml() {
     return;
   }
 
+  const finishPositionX = getFinishPositionXForObjects(objects);
+
   const lines = [];
   lines.push('<?xml version="1.0" encoding="UTF-8"?>');
-  lines.push(`<Level source="${xmlEscape(currentLevelLabel)}" objectCount="${objects.length}" gdUnitsPerTile="${GD_UNITS_PER_TILE}">`);
+  lines.push(
+    `<Level source="${xmlEscape(currentLevelLabel)}"` +
+    ` objectCount="${objects.length}"` +
+    ` gdUnitsPerTile="${GD_UNITS_PER_TILE}"` +
+    ` musicID="${xmlEscape(currentLevelMetadata.musicID)}"` +
+    ` defaultStartSpeed="${xmlEscape(currentLevelMetadata.defaultStartSpeed)}"` +
+    ` finishPositionX="${xmlEscape(formatNumber(finishPositionX, 6))}">`
+  );
 
   const sortedObjects = [...objects].sort((a, b) =>
-    (a.x - b.x) || (a.y - b.y) || (a.objectId - b.objectId)
+    (a.objectId - b.objectId) || (a.x - b.x) || (a.y - b.y)
   );
 
   for (const obj of sortedObjects) {
@@ -1120,7 +1175,7 @@ async function loadSavedLevelByIndex(localIndex) {
       level.objectCount = parsed.length;
       renderSavedLevelsList();
     }
-    renderLevel(parsed, level.name);
+    renderLevel(parsed, level.name, parseLevelMetadataFromLevelString(levelString, level.songID));
     setStatus(`${level.name}: ${parsed.length} objects loaded from created levels.`);
   } catch (err) {
     console.error(err);
@@ -1157,7 +1212,7 @@ async function loadSampleEmbeddedLevel() {
       setStatus("No embedded sample level is available.");
       return;
     }
-    renderLevel(parseObjectsFromLevelString(EMBEDDED_LEVEL_STRING), "Current embedded level");
+    renderLevel(parseObjectsFromLevelString(EMBEDDED_LEVEL_STRING), "Current embedded level", parseLevelMetadataFromLevelString(EMBEDDED_LEVEL_STRING));
   } catch (err) {
     console.error(err);
     setStatus("Could not load embedded level: " + err.message);
